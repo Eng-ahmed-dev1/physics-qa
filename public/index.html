@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physics AI Oracle</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>Physics AI Oracle</h1>
+        <p class="subtitle">Ask anything from your study materials</p>
+    </header>
+
+    <div class="search-container">
+        <div class="search-box">
+            <input type="text" id="questionInput" placeholder="Enter your physics query..." autocomplete="off">
+            <button id="askBtn">
+                <span>Analyze</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="error-message" id="errorMsg"></div>
+
+    <div class="loading-wrapper" id="loadingIndicator">
+        <div class="orbit-spinner">
+            <div class="orbit"></div>
+            <div class="orbit"></div>
+            <div class="core"></div>
+        </div>
+        <div class="loading-text">Synthesizing Data...</div>
+    </div>
+
+    <div class="results-container" id="resultsContainer">
+        <div class="answer-card">
+            <div class="answer-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 16v-4"></path>
+                    <path d="M12 8h.01"></path>
+                </svg>
+                <span class="answer-label">AI Synthesis</span>
+            </div>
+            <div class="answer-text" id="answerText"></div>
+            
+            <div class="sources-container" id="sourcesContainer" style="display: none;">
+                <div class="sources-label">Reference Nodes</div>
+                <div class="badges" id="badgesContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const askBtn = document.getElementById('askBtn');
+        const questionInput = document.getElementById('questionInput');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const answerText = document.getElementById('answerText');
+        const sourcesContainer = document.getElementById('sourcesContainer');
+        const badgesContainer = document.getElementById('badgesContainer');
+        const errorMsg = document.getElementById('errorMsg');
+
+        // Typing effect helper
+        async function typeWriter(element, text, speed = 8) {
+            element.textContent = '';
+            for (let i = 0; i < text.length; i++) {
+                element.textContent += text.charAt(i);
+                // slight randomization for organic feel
+                await new Promise(r => setTimeout(r, speed + (Math.random() * 5)));
+            }
+        }
+
+        async function askQuestion() {
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            // UI Reset
+            errorMsg.style.display = 'none';
+            resultsContainer.style.display = 'none';
+            sourcesContainer.style.display = 'none';
+            answerText.textContent = '';
+            
+            loadingIndicator.style.display = 'flex';
+            askBtn.disabled = true;
+
+            try {
+                const response = await fetch('/.netlify/functions/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch answer.');
+                }
+
+                loadingIndicator.style.display = 'none';
+                resultsContainer.style.display = 'flex';
+                
+                // Smooth scroll to results
+                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                // Start typing effect for answer
+                await typeWriter(answerText, data.answer, 12);
+
+                // Reveal sources after typing
+                if (data.sources && data.sources.length > 0) {
+                    badgesContainer.innerHTML = '';
+                    data.sources.forEach(src => {
+                        const badge = document.createElement('div');
+                        badge.className = 'badge';
+                        badge.innerHTML = `
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            ${src.source} <span class="pg">Pg. ${src.page}</span>
+                        `;
+                        badgesContainer.appendChild(badge);
+                    });
+                    sourcesContainer.style.display = 'block';
+                    sourcesContainer.style.animation = 'fadeIn 0.5s ease-out';
+                }
+                
+            } catch (error) {
+                loadingIndicator.style.display = 'none';
+                errorMsg.textContent = error.message;
+                errorMsg.style.display = 'block';
+            } finally {
+                askBtn.disabled = false;
+            }
+        }
+
+        askBtn.addEventListener('click', askQuestion);
+
+        questionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+    </script>
+</body>
+</html>
