@@ -80,8 +80,8 @@ exports.handler = async (event, context) => {
         });
 
         scoredChunks.sort((a, b) => b.score - a.score);
-        const stemChunks = scoredChunks.filter(c => c.source === 'stem 3 2022_2nd term .pdf').slice(0, 3);
-        const otherChunks = scoredChunks.filter(c => c.source !== 'stem 3 2022_2nd term .pdf').slice(0, 1);
+        const stemChunks = scoredChunks.filter(c => c.source === 'stem 3 2022_2nd term .pdf').slice(0, 6);
+        const otherChunks = scoredChunks.filter(c => c.source !== 'stem 3 2022_2nd term .pdf').slice(0, 4);
         const topChunks = [...stemChunks, ...otherChunks];
         const contextText = topChunks.map(c => `[Source: ${c.source}, Page: ${c.page}]\n${c.text}`).join('\n\n');
 
