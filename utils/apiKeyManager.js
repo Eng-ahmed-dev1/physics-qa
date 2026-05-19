@@ -39,7 +39,7 @@ async function initKeys() {
     // Collect all GROK_API_KEY_X or XAI_API_KEY_X
     for (const [keyName, keyValue] of Object.entries(process.env)) {
         if ((keyName.startsWith('GROK_API_KEY') || keyName.startsWith('XAI_API_KEY')) && keyValue) {
-            addKey(keyName, keyValue, 'https://api.x.ai/v1/chat/completions', 'grok-beta');
+            addKey(keyName, keyValue, 'https://api.x.ai/v1/chat/completions', 'grok-3');
         }
     }
 
@@ -78,10 +78,10 @@ async function initKeys() {
 
 async function flushToDb() {
     if (!supabase || dirtyKeys.size === 0) return;
-    
+
     const keysToFlush = Array.from(dirtyKeys);
     dirtyKeys.clear();
-    
+
     const upsertData = keysToFlush.map(keyId => {
         const state = keysState[keyId];
         return {
@@ -137,12 +137,12 @@ function reportFailure(keyId) {
     if (keysState[keyId]) {
         keysState[keyId].failureCount++;
         keysState[keyId].lastUsed = Date.now();
-        
+
         if (keysState[keyId].failureCount >= 3) {
             keysState[keyId].disabledUntil = Date.now() + 5 * 60 * 1000;
-            keysState[keyId].failureCount = 0; 
+            keysState[keyId].failureCount = 0;
         }
-        
+
         dirtyKeys.add(keyId);
     }
 }
