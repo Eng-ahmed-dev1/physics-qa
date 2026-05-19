@@ -80,22 +80,29 @@ exports.handler = async (event, context) => {
         });
 
         scoredChunks.sort((a, b) => b.score - a.score);
-        const topChunks = scoredChunks.slice(0, 4);
+        const stemChunks = scoredChunks.filter(c => c.source === 'stem 3 2022_2nd term .pdf').slice(0, 3);
+        const otherChunks = scoredChunks.filter(c => c.source !== 'stem 3 2022_2nd term .pdf').slice(0, 1);
+        const topChunks = [...stemChunks, ...otherChunks];
         const contextText = topChunks.map(c => `[Source: ${c.source}, Page: ${c.page}]\n${c.text}`).join('\n\n');
 
-        const systemPrompt = `You are a Physics Question Answering System.
+        const systemPrompt = `You are a Physics Question Answering System. You MUST follow these rules strictly:
 
-Rules:
-- Use ONLY provided context
-- Never use external knowledge
-- Give a COMPLETE and DETAILED answer, not just a phrase
-- Explain the concept fully using all relevant information from the context
-- If answer not found say: 'Not found in provided materials'
-- Always include source file and page number
-- Output must be strict JSON:
+1. Your PRIMARY and MOST IMPORTANT source is "stem 3 2022_2nd term .pdf" - always prioritize answers from this file.
+2. Answer ONLY from the provided context. Do NOT use external knowledge.
+3. If the answer is not in "stem 3 2022_2nd term .pdf", check other sources but mention that.
+4. If not found in any source, say: "Not found in provided materials"
+5. Detect the question type and answer accordingly:
+   - If it's a DEFINITION question → give the exact scientific term and its full definition
+   - If it's a MULTIPLE CHOICE question → identify the correct option and explain why
+   - If it's a PROVE/DERIVE question → show the full step-by-step proof
+   - If it's a CALCULATION question → solve it step by step with units
+   - If it's a CONCEPT question → give a complete detailed explanation
+6. Be detailed and complete in your answer.
+
+Output must be strict JSON:
 {
-  "answer": "...",
-  "sources": [{ "source": "file", "page": number }]
+  "answer": "your detailed answer here",
+  "sources": [{ "source": "filename.pdf", "page": 1 }]
 }`;
 
         const messages = [
