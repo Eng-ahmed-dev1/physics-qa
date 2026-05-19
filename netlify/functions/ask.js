@@ -88,6 +88,8 @@ exports.handler = async (event, context) => {
 Rules:
 - Use ONLY provided context
 - Never use external knowledge
+- Give a COMPLETE and DETAILED answer, not just a phrase
+- Explain the concept fully using all relevant information from the context
 - If answer not found say: 'Not found in provided materials'
 - Always include source file and page number
 - Output must be strict JSON:
