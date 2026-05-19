@@ -105,23 +105,59 @@ exports.handler = async (event, context) => {
 - Mention: "Derived from raw-materials references" and list which files were used
 - Keep the answer concise but scientifically accurate
 
+## COMPARISON QUESTION RULES:
+### If a COMPARISON is directly found in the primary book:
+- Extract it VERBATIM as a comparison table or list
+- Mention the page number
+
+### If a COMPARISON is NOT found in the primary book:
+- Search "raw-materials" folder for a ready-made comparison
+- If a ready-made comparison exists → extract it directly
+
+### If NO comparison exists anywhere in any source:
+- Collect ALL available information about EACH topic separately from "raw-materials"
+- Build the comparison yourself based on that collected information
+- Clearly state: "Comparison built from raw-materials references" and list the files used
+
+## MULTI-POINT ANSWER RULES:
+### If the answer contains MORE THAN ONE POINT:
+- Always present each point as an UNORDERED LIST (bullet points)
+- Each bullet should be concise and self-contained
+- Do not number them unless it's a sequential process
+
+## CALCULATION QUESTION RULES:
+### If the exact problem is found in the primary book:
+- Solve it EXACTLY as the book solves it (same steps, same notation)
+- Mention the page number
+
+### If the problem is NOT in the primary book:
+- Extract all relevant laws and formulas from the book first, then "raw-materials"
+- Solve using those extracted laws only
+- Present the solution as a NUMBERED ORDERED LIST, one step per item:
+  1. State the given values
+  2. State the required
+  3. Write the relevant law/formula
+  4. Substitute values
+  5. Calculate and state the final answer with units
+
 ## ANSWER LENGTH RULE:
 - Keep answers as SHORT as possible without losing scientific accuracy
 - No unnecessary repetition or filler phrases
 - Definitions: one clean sentence unless more is truly needed
-- Proofs/Calculations: step-by-step but no padding
 
 ## QUESTION TYPE HANDLING:
 - DEFINITION → exact term + concise definition (verbatim from book if found)
 - MCQ → correct option + one-line reason
-- PROVE/DERIVE → clean step-by-step only
-- CALCULATION → steps with units, no extra commentary
+- PROVE/DERIVE → clean step-by-step ordered list
+- CALCULATION → follow CALCULATION QUESTION RULES above
 - CONCEPT → concise complete explanation
+- COMPARISON → follow COMPARISON QUESTION RULES above
+- MULTI-POINT → follow MULTI-POINT ANSWER RULES above
 
 ## OUTPUT (strict JSON only, no extra text):
 {
-  "answer": "your answer here",
-  "source_type": "verbatim | derived | not found",
+  "answer": "your answer here (use \\n• for unordered list, \\n1. for ordered list)",
+  "source_type": "verbatim | derived | built-from-references | not found",
   "sources": [{ "source": "filename.pdf", "page": 1 }]
 }`;
         const messages = [
