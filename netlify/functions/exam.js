@@ -9,9 +9,11 @@ exports.handler = async (event, context) => {
 
     try {
         const body = JSON.parse(event.body);
-        const questionCount = body.count || 50;
 
-        // ── 1. Load ALL knowledge chunks ──────────────────────────
+        // ── Clamp to max 25 (Groq token limit safe zone) ──────────
+        const questionCount = Math.min(Math.max(body.count || 20, 5), 25);
+
+        // ── 1. Load knowledge ──────────────────────────────────────
         let knowledgePath = path.resolve(__dirname, '../../public/data/knowledge.json');
         if (!fs.existsSync(knowledgePath)) {
             knowledgePath = path.join(process.cwd(), 'public/data/knowledge.json');
@@ -36,37 +38,36 @@ exports.handler = async (event, context) => {
         const sourceNames = Object.keys(sourceMap);
         const stemSource = 'stem 3 2022_2nd term .pdf';
 
-        // ── 3. Sample chunks from ALL sources ─────────────────────
-        // Take up to 20 chunks from primary book + up to 5 from each other source
+        // ── 3. Sample chunks — fewer to reduce input tokens ────────
         const sampledChunks = [];
 
-        // Primary book - take spread chunks (not just first 20)
+        // Primary book: max 10 spread chunks
         if (sourceMap[stemSource]) {
             const stemChunks = sourceMap[stemSource];
-            const step = Math.max(1, Math.floor(stemChunks.length / 20));
+            const step = Math.max(1, Math.floor(stemChunks.length / 10));
             for (let i = 0; i < stemChunks.length; i += step) {
                 sampledChunks.push(stemChunks[i]);
-                if (sampledChunks.filter(c => c.source === stemSource).length >= 20) break;
+                if (sampledChunks.filter(c => c.source === stemSource).length >= 10) break;
             }
         }
 
-        // All other sources - sample from each
+        // Other sources: max 3 chunks each
         for (const src of sourceNames) {
             if (src === stemSource) continue;
             const chunks = sourceMap[src];
-            const step = Math.max(1, Math.floor(chunks.length / 5));
+            const step = Math.max(1, Math.floor(chunks.length / 3));
             for (let i = 0; i < chunks.length; i += step) {
                 sampledChunks.push(chunks[i]);
-                if (sampledChunks.filter(c => c.source === src).length >= 5) break;
+                if (sampledChunks.filter(c => c.source === src).length >= 3) break;
             }
         }
 
-        // ── 4. Build context ───────────────────────────────────────
+        // ── 4. Build context — trim each chunk to 300 chars ────────
         const contextText = sampledChunks
-            .map(c => `[Source: ${c.source}, Page: ${c.page}]\n${c.text}`)
-            .join('\n\n');
+            .map(c => `[${c.source}, P${c.page}] ${c.text.slice(0, 300)}`)
+            .join('\n');
 
-        // ── 5. Calculate type distribution ────────────────────────
+        // ── 5. Type distribution ───────────────────────────────────
         const dist = {
             definition: Math.floor(questionCount * 0.10),
             concept: Math.floor(questionCount * 0.15),
@@ -76,56 +77,34 @@ exports.handler = async (event, context) => {
             mcq: Math.floor(questionCount * 0.15),
             prove: Math.floor(questionCount * 0.10),
         };
-        // Fill remainder in calculations
         const assigned = Object.values(dist).reduce((a, b) => a + b, 0);
         dist.calculation += questionCount - assigned;
 
-        // ── 6. System + User prompt ────────────────────────────────
-        const systemPrompt = `You are a Physics Exam Generator. Output ONLY strict JSON, no extra text.`;
+        // ── 6. Prompts ─────────────────────────────────────────────
+        const systemPrompt = `You are a Physics Exam Generator. Output ONLY valid JSON, no extra text, no markdown.`;
 
-        const userPrompt = `
-You have the following physics content from multiple sources:
-
+        const userPrompt = `Physics content:
 ${contextText}
 
-Generate exactly ${questionCount} exam questions using ALL the content above.
+Generate exactly ${questionCount} questions. Distribution:
+- definition: ${dist.definition}
+- concept: ${dist.concept}
+- compare: ${dist.compare}
+- calculation: ${dist.calculation}
+- true_false: ${dist.true_false}
+- mcq: ${dist.mcq} (with 4 options)
+- prove: ${dist.prove}
 
-## STRICT DISTRIBUTION (do not deviate):
-- definition: ${dist.definition} questions
-- concept: ${dist.concept} questions  
-- compare: ${dist.compare} questions
-- calculation: ${dist.calculation} questions
-- true_false: ${dist.true_false} questions
-- mcq: ${dist.mcq} questions (include 4 options A/B/C/D)
-- prove: ${dist.prove} questions
+Rules:
+- No repeated questions
+- Max 2 "What is X?" style questions
+- MCQ must have options array with 4 items
+- Use real numbers from content for calculations
 
-## RULES:
-- Cover EVERY source and EVERY topic found in the content
-- NEVER repeat the same question or same topic twice in a row
-- NEVER generate more than 2 "What is X?" questions total
-- For MCQ: include options array ["A)...", "B)...", "C)...", "D)..."]
-- For calculation: use real numbers from the content
-- Spread questions across ALL pages and sources evenly
+JSON output:
+{"exam":[{"number":1,"type":"...","question":"...","options":[],"source":"...","page":1}],"summary":{"total":${questionCount},"by_type":{},"sources_covered":[]}}
 
-## OUTPUT (strict JSON):
-{
-  "exam": [
-    {
-      "number": 1,
-      "type": "definition | concept | compare | calculation | true_false | mcq | prove",
-      "question": "question text",
-      "options": ["A)...", "B)...", "C)...", "D)..."],
-      "source": "filename.pdf",
-      "page": 1
-    }
-  ],
-  "summary": {
-    "total": ${questionCount},
-    "by_type": {},
-    "sources_covered": []
-  }
-}
-Note: "options" field only for mcq type, omit for others.`;
+options field: only for mcq, empty array for others.`;
 
         // ── 7. API Call ────────────────────────────────────────────
         let aiMessage = null;
@@ -153,9 +132,9 @@ Note: "options" field only for mcq type, omit for others.`;
                             { role: 'system', content: systemPrompt },
                             { role: 'user', content: userPrompt }
                         ],
-                        temperature: 0.7, // أعلى شوية عشان تنوع
+                        temperature: 0.7,
                         response_format: { type: "json_object" },
-                        max_tokens: 16000
+                        max_tokens: 6000  // safe for Groq + llama-3.3-70b
                     })
                 });
 
@@ -193,7 +172,9 @@ Note: "options" field only for mcq type, omit for others.`;
 
         let parsedResult;
         try {
-            parsedResult = JSON.parse(aiMessage);
+            // Strip markdown fences if model added them
+            const clean = aiMessage.replace(/```json|```/g, '').trim();
+            parsedResult = JSON.parse(clean);
         } catch (e) {
             parsedResult = { error: "Failed to parse exam", raw: aiMessage };
         }

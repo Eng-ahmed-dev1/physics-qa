@@ -40,8 +40,8 @@ function extractCount(q) {
     const match = q.match(/\d+/);
     if (match) {
         const n = parseInt(match[0]);
-        // Sanity clamp: 5 – 100
-        return Math.min(Math.max(n, 5), 100);
+        // Sanity clamp: 5 – 30 (Groq token limit)
+        return Math.min(Math.max(n, 5), 30);
     }
     return 20; // default
 }
